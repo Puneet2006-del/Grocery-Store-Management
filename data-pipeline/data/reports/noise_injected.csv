@@ -1,0 +1,17 @@
+table,issue,rows
+sales,delayed POS feed: S03 missing last 2 days,32
+sales,missing unit_price,349
+sales,missing revenue,233
+sales,negative qty_sold (sign error),46
+sales,sale_date in DD/MM/YYYY format,466
+sales,store_id lowercase/whitespace,233
+sales,unknown sku_id (orphan rows),23
+sales,duplicate rows,93
+receipts,missing unit_cost,156
+receipts,received_date in DD/MM/YYYY format,312
+receipts,duplicate rows,46
+waste,missing cost,71
+waste,reason in UPPERCASE,142
+waste,duplicate rows,21
+inventory_snapshots,missing on_hand_qty,233
+inventory_snapshots,duplicate rows,70

@@ -1,0 +1,19 @@
+table,issue,rows,action
+receipts,received_date not in ISO format,314,parsed as DD/MM/YYYY
+receipts,duplicate rows,46,kept first on ['receipt_id']
+receipts,missing unit_cost,156,filled with product standard cost
+waste,reason had wrong case,142,lower-cased
+waste,duplicate rows,21,"kept first on ['waste_date', 'store_id', 'sku_id', 'batch_id', 'reason']"
+waste,missing cost,71,filled as qty x product cost
+sales,store_id had whitespace/lowercase,235,stripped and upper-cased
+sales,sale_date not in ISO format,472,parsed as DD/MM/YYYY
+sales,negative qty_sold,46,sign corrected (abs)
+sales,"unknown store/SKU, bad date or missing qty",23,removed to quarantine
+sales,duplicate rows,93,"kept first on ['sale_date', 'store_id', 'sku_id']"
+sales,missing unit_price,344,derived as revenue / qty
+sales,missing unit_price (no revenue to derive from),5,carried forward from previous day
+sales,missing revenue,233,computed as qty x unit_price
+sales,DELAYED FEED: store S03 last sale 2026-09-28,2,loaded as-is; flagged (not imputed)
+inventory_snapshots,duplicate rows,70,"kept first on ['snapshot_date', 'store_id', 'sku_id']"
+inventory_snapshots,missing on_hand_qty,233,rebuilt from receipts - sales - waste
+inventory_snapshots,stock-balance mismatch explained by delayed feed,32,flagged in reconciliation.csv
