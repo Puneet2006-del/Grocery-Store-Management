@@ -1,0 +1,5 @@
+store_id,name,city,type,lat,lon
+S01,Delhi-Central,Delhi,urban,28.631500,77.216700
+S02,Delhi-South,Delhi,urban,28.524500,77.206600
+S03,Gurgaon-Sector29,Gurgaon,suburban,28.469000,77.064000
+S04,Noida-Sector18,Noida,suburban,28.570800,77.326100

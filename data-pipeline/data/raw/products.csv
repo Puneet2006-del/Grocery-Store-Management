@@ -1,0 +1,17 @@
+sku_id,name,category,shelf_life_days,unit,cost,base_price,storage_temp
+P01,Tomatoes,produce,6,kg,28.00,40.00,ambient
+P02,Spinach,produce,3,kg,22.00,35.00,chilled
+P03,Bananas,produce,5,kg,35.00,55.00,ambient
+P04,Capsicum,produce,7,kg,45.00,70.00,chilled
+P05,Milk 1L,dairy,7,L,52.00,64.00,chilled
+P06,Yogurt 400g,dairy,14,pack,38.00,55.00,chilled
+P07,Paneer 200g,dairy,10,pack,60.00,90.00,chilled
+P08,Sweet Lassi 200ml,dairy,8,pack,14.00,25.00,chilled
+P09,White Bread,bakery,4,pack,28.00,45.00,ambient
+P10,Multigrain Bread,bakery,5,pack,38.00,60.00,ambient
+P11,Croissant,bakery,2,pc,22.00,40.00,ambient
+P12,Pav Buns,bakery,3,pack,20.00,35.00,ambient
+P13,Chicken Breast,meat,3,kg,210.00,320.00,chilled
+P14,Chicken Curry Cut,meat,3,kg,170.00,260.00,chilled
+P15,Mutton Curry Cut,meat,4,kg,540.00,780.00,chilled
+P16,Rohu Fish,meat,2,kg,180.00,280.00,chilled
