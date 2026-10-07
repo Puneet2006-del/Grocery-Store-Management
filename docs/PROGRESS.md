@@ -6,12 +6,12 @@ Status key: ✅ done | 🟡 in progress | ⬜ not started
 
 | Milestone | Ends when (finish line) | Weight* | Done | Status |
 |---|---|---|---|---|
-| **M1: Data Foundation** | Data in MySQL, APIs return it, React inventory page shows it | 20% | ~60% | 🟡 In progress |
+| **M1: Data Foundation** | Data in MySQL, APIs return it, React inventory page shows it | 20% | ~85% | 🟡 Nearly done |
 | **M2: Intelligence Layer** | Forecast, shelf-life, spoilage-risk and stockout/excess outputs exist with measured accuracy | 25% | 0% | ⬜ |
 | **M3: Agentic Decision Engine** | Agents + orchestrator produce evidence-backed proposals; planner approve/modify/reject works; simulated ERP/WMS/POS log actions | 30% | 0% | ⬜ |
 | **M4: Dashboard, Integration, Evaluation** | Full planner workflow in React, end-to-end scenarios run, evaluation report vs baselines | 25% | 0% | ⬜ |
 
-**Overall project progress: about 12%** (0.60 x 20%).
+**Overall project progress: about 17%** (0.85 x 20%). M1 percentage = 11 of 13 tasks done.
 *Weights are our own estimate of effort. Change them if your team sees it differently.
 
 ---
@@ -24,8 +24,8 @@ Status key: ✅ done | 🟡 in progress | ⬜ not started
 
 - [x] Data for multiple stores and perishable products is available (4 stores, 16 SKUs, 12 months)
 - [x] The ingestion pipeline can load the dataset into MySQL (clean, validate, load, reconcile all run)
-- [ ] Product, sales and inventory APIs return valid data
-- [ ] The React page displays inventory from the backend
+- [x] Product, sales and inventory APIs return valid data
+- [x] The React page displays inventory from the backend
 
 ### Task checklist
 
@@ -39,13 +39,13 @@ Status key: ✅ done | 🟡 in progress | ⬜ not started
 | 6 | Noise injection (missing values, duplicates, bad formats, delayed feed) | ✅ |
 | 7 | Cleaning pipeline + data-quality report + stock reconciliation | ✅ |
 | 8 | Load cleaned data into MySQL + row-count verification | ✅ |
-| 9 | Spring Boot project connected to MySQL (port 3307) | 🟡 next |
-| 10 | APIs: stores, products, inventory (with days to expiry), sales (paginated) | ⬜ |
-| 11 | CORS + Swagger/OpenAPI docs | ⬜ |
-| 12 | React inventory page (filters, expiry colour-coding) | ⬜ |
+| 9 | Spring Boot project connected to MySQL (port 3307) | ✅ |
+| 10 | APIs: stores, products, inventory (with days to expiry), sales (paginated) | ✅ |
+| 11 | CORS + Swagger/OpenAPI docs | 🟡 CORS done, Swagger optional |
+| 12 | React inventory page (filters, expiry colour-coding) | ✅ |
 | 13 | Integration test, README, git tag `milestone-1` | ⬜ |
 
-**Data side of M1 is complete. Next step:** create the Spring Boot project and connect it to MySQL (port 3307).
+**All four completion criteria are met.** Remaining: optional Swagger, README, full-flow test, git tag `milestone-1`.
 
 ---
 
@@ -117,3 +117,4 @@ Status key: ✅ done | 🟡 in progress | ⬜ not started
 |---|---|
 | 2026-10-05 | Setup, schema, master data, weather/events and simulation done. Ingestion scripts delivered, awaiting run. |
 | 2026-10-05 | Ingestion pipeline run and verified: data loaded into MySQL. Data side of Milestone 1 complete. Starting Spring Boot backend. |
+| 2026-10-07 | Spring Boot APIs (stores, products, inventory, sales) verified. React inventory page working against the live backend. All four M1 completion criteria met. |

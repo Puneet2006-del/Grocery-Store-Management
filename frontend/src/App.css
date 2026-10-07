@@ -1,0 +1,172 @@
+.page {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 24px 16px 48px;
+}
+
+.page-header h1 {
+  margin: 0;
+  font-size: 1.6rem;
+}
+
+.muted {
+  margin: 4px 0 0;
+  color: #6b7785;
+}
+
+.filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin: 20px 0 12px;
+}
+
+.filters label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 0.8rem;
+  color: #52606d;
+}
+
+.filters .grow {
+  flex: 1;
+  min-width: 180px;
+}
+
+.filters select,
+.filters input {
+  padding: 8px 10px;
+  font-size: 0.95rem;
+  border: 1px solid #cbd2d9;
+  border-radius: 6px;
+  background: #fff;
+  min-width: 160px;
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.chip {
+  padding: 6px 12px;
+  font-size: 0.85rem;
+  border: 1px solid #cbd2d9;
+  border-radius: 999px;
+  background: #fff;
+  cursor: pointer;
+}
+
+.chip.active {
+  background: #1f2933;
+  border-color: #1f2933;
+  color: #fff;
+}
+
+.banner {
+  padding: 12px 14px;
+  border-radius: 6px;
+  background: #e4e7eb;
+  margin-bottom: 12px;
+}
+
+.banner.error {
+  background: #fde8e8;
+  color: #9b1c1c;
+}
+
+.table-wrap {
+  overflow-x: auto;
+  background: #fff;
+  border: 1px solid #e4e7eb;
+  border-radius: 8px;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.92rem;
+}
+
+th,
+td {
+  padding: 10px 12px;
+  text-align: left;
+  white-space: nowrap;
+}
+
+thead th {
+  background: #f0f2f5;
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: #52606d;
+}
+
+tbody tr {
+  border-top: 1px solid #eef0f3;
+}
+
+.num {
+  text-align: right;
+}
+
+.cap {
+  text-transform: capitalize;
+}
+
+.empty {
+  text-align: center;
+  color: #6b7785;
+  padding: 24px;
+}
+
+/* Row colours: red <= 1 day, amber <= 3 days, green otherwise */
+.row-EXPIRED,
+.row-CRITICAL {
+  background: #fdecec;
+}
+
+.row-WARNING {
+  background: #fff6e0;
+}
+
+.row-OK {
+  background: #eef9f0;
+}
+
+.row-OUT_OF_STOCK {
+  background: #e4e7eb;
+}
+
+.badge {
+  display: inline-block;
+  padding: 2px 10px;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+
+.badge-EXPIRED,
+.badge-CRITICAL {
+  background: #f8b4b4;
+  color: #7a1010;
+}
+
+.badge-WARNING {
+  background: #fcd98a;
+  color: #7a4b00;
+}
+
+.badge-OK {
+  background: #a7e3b3;
+  color: #14532d;
+}
+
+.badge-OUT_OF_STOCK {
+  background: #9aa5b1;
+  color: #1f2933;
+}
