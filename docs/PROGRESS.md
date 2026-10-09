@@ -6,12 +6,12 @@ Status key: ✅ done | 🟡 in progress | ⬜ not started
 
 | Milestone | Ends when (finish line) | Weight* | Done | Status |
 |---|---|---|---|---|
-| **M1: Data Foundation** | Data in MySQL, APIs return it, React inventory page shows it | 20% | ~85% | 🟡 Nearly done |
-| **M2: Intelligence Layer** | Forecast, shelf-life, spoilage-risk and stockout/excess outputs exist with measured accuracy | 25% | 0% | ⬜ |
-| **M3: Agentic Decision Engine** | Agents + orchestrator produce evidence-backed proposals; planner approve/modify/reject works; simulated ERP/WMS/POS log actions | 30% | 0% | ⬜ |
+| **M1: Data Foundation** | Data in MySQL, APIs return it, React inventory page shows it | 20% | 100% | ✅ Complete (tagged `milestone-1`) |
+| **M2: Intelligence Layer** | Forecast, shelf-life, spoilage-risk and stockout/excess outputs exist with measured accuracy | 25% | 100% | ✅ Complete (tag `milestone-2`) |
+| **M3: Agentic Decision Engine** | Agents + orchestrator produce evidence-backed proposals; planner approve/modify/reject works; simulated ERP/WMS/POS log actions | 30% | ~5% | 🟡 Started |
 | **M4: Dashboard, Integration, Evaluation** | Full planner workflow in React, end-to-end scenarios run, evaluation report vs baselines | 25% | 0% | ⬜ |
 
-**Overall project progress: about 17%** (0.85 x 20%). M1 percentage = 11 of 13 tasks done.
+**Overall project progress: about 46%** (20% from M1 + 25% from M2 + 0.05 x 30% from M3). 
 *Weights are our own estimate of effort. Change them if your team sees it differently.
 
 ---
@@ -41,11 +41,11 @@ Status key: ✅ done | 🟡 in progress | ⬜ not started
 | 8 | Load cleaned data into MySQL + row-count verification | ✅ |
 | 9 | Spring Boot project connected to MySQL (port 3307) | ✅ |
 | 10 | APIs: stores, products, inventory (with days to expiry), sales (paginated) | ✅ |
-| 11 | CORS + Swagger/OpenAPI docs | 🟡 CORS done, Swagger optional |
+| 11 | CORS (Swagger dropped: springdoc not confirmed compatible with Spring Boot 4.1, not a completion criterion) | ✅ |
 | 12 | React inventory page (filters, expiry colour-coding) | ✅ |
-| 13 | Integration test, README, git tag `milestone-1` | ⬜ |
+| 13 | Integration test, README, git tag `milestone-1` | ✅ |
 
-**All four completion criteria are met.** Remaining: optional Swagger, README, full-flow test, git tag `milestone-1`.
+**All four completion criteria are met.** Milestone 1 is complete and tagged `milestone-1`.
 
 ---
 
@@ -55,14 +55,14 @@ Status key: ✅ done | 🟡 in progress | ⬜ not started
 
 | # | Task | Status |
 |---|---|---|
-| 1 | Feature engineering (lags, weekday, weather, events, promos) | ⬜ |
-| 2 | Baseline forecasts (naive, moving average) for comparison | ⬜ |
-| 3 | Demand-forecasting model, short-term, per store and SKU | ⬜ |
-| 4 | Forecast accuracy measured (e.g. WAPE) against baselines and `ground_truth_demand.csv` | ⬜ |
-| 5 | Remaining shelf-life calculation per batch | ⬜ |
-| 6 | Spoilage-risk estimate per batch (expected unsold units before expiry) | ⬜ |
-| 7 | Stockout and excess-stock detection | ⬜ |
-| 8 | Predictions stored in MySQL and exposed through the API | ⬜ |
+| 1 | Feature engineering: daily store/SKU panel from MySQL (`intelligence/dataset.py`) | ✅ |
+| 2 | Baseline forecasts + rolling backtest (`intelligence/baselines.py`): best baseline WAPE 29.8% | ✅ |
+| 3 | Demand-forecasting model, 1-7 days ahead (`intelligence/forecast_model.py`) | ✅ |
+| 4 | Forecast accuracy: model WAPE 25.5% vs best baseline 29.8% (14.4% lower), noise floor 24.0% | ✅ |
+| 5 | Remaining shelf-life per batch: current stock (`risk_engine.py`) and history rebuilt from sales and receipts (`batch_state.py`: 100% match with snapshots) | ✅ |
+| 6 | Spoilage-risk estimate per batch. Backtest over 50 past days: AUC 0.983 vs rule 0.974; flagged-HIGH precision 65% vs rule 41%; predicted 2,311 vs actual 2,018 units written off | ✅ |
+| 7 | Stockout and excess-stock detection. Backtest: AUC 0.945 vs rule 0.907; caught 52 of 84 real stockouts (62%) vs rule 40 (48%) at similar precision | ✅ |
+| 8 | Predictions stored in MySQL and exposed through the API | ✅ |
 
 ---
 
@@ -75,8 +75,8 @@ Status key: ✅ done | 🟡 in progress | ⬜ not started
 | 1 | Demand and freshness agents | ⬜ |
 | 2 | Replenishment, markdown and inter-store transfer agents | ⬜ |
 | 3 | Orchestrator comparing options and choosing one action per SKU/store | ⬜ |
-| 4 | Configurable business rules (margin floor, max markdown, transfer limits) | ⬜ |
-| 5 | Recommendation format: timing, quantity or markdown level, confidence, expected effect, evidence | ⬜ |
+| 4 | Configurable business rules (margin floor, max markdown, transfer limits) | 🟡 rules table delivered (`db/schema_m3.sql`) |
+| 5 | Recommendation format: timing, quantity or markdown level, confidence, expected effect, evidence | 🟡 format and tables delivered (`db/schema_m3.sql`, `docs/M3_DESIGN.md`) |
 | 6 | Planner approval APIs: approve, modify, reject | ⬜ |
 | 7 | Simulated ERP, WMS and POS interfaces | ⬜ |
 | 8 | Decision log and feedback log | ⬜ |
@@ -118,3 +118,11 @@ Status key: ✅ done | 🟡 in progress | ⬜ not started
 | 2026-10-05 | Setup, schema, master data, weather/events and simulation done. Ingestion scripts delivered, awaiting run. |
 | 2026-10-05 | Ingestion pipeline run and verified: data loaded into MySQL. Data side of Milestone 1 complete. Starting Spring Boot backend. |
 | 2026-10-07 | Spring Boot APIs (stores, products, inventory, sales) verified. React inventory page working against the live backend. All four M1 completion criteria met. |
+| 2026-10-07 | Swagger dropped. Milestone 2 started: dataset builder and baseline forecast backtest delivered. |
+| 2026-10-07 | Baselines run: best baseline WAPE 29.8% (weekday average). Forecast model delivered, awaiting run. |
+| 2026-10-07 | Milestone 1 committed and tagged `milestone-1`. Milestone 1 complete. |
+| 2026-10-07 | Forecast model run: WAPE 25.5% vs best baseline 29.8% (noise floor 24.0%). Production forecast with 80% range delivered. |
+| 2026-10-07 | Production forecast saved. Spoilage-risk and stockout/excess engine delivered, awaiting run. |
+| 2026-10-07 | Risk engine run. Batch-history reconstruction and risk backtest delivered, awaiting run. Remaining in M2: API for forecasts and risk tables. |
+| 2026-10-07 | Risk backtest run (see tasks 5-7 for results). Spring Boot endpoints for forecasts and risk delivered, awaiting run. |
+| 2026-10-07 | Milestone 2 complete: forecast and risk endpoints verified. Milestone 3 started: design document, tables and business rules delivered. |
