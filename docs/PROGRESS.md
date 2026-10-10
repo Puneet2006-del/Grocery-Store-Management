@@ -78,8 +78,8 @@ Status key: ✅ done | 🟡 in progress | ⬜ not started
 | 4 | Configurable business rules (margin floor, max markdown, transfer limits) | ✅ (`business_rules` table, read by the agents) |
 | 5 | Recommendation format: timing, quantity or markdown level, confidence, expected effect, evidence | ✅ (`recommendations` table, `docs/M3_DESIGN.md`) |
 | 6 | Planner approval APIs: approve, modify, reject (`RecommendationController`, rules API) | 🟡 delivered, run pending |
-| 7 | Simulated ERP, WMS and POS interfaces | ⬜ |
-| 8 | Decision log (written on every decision) and feedback log | 🟡 decision log delivered, feedback log pending |
+| 7 | Simulated ERP, WMS and POS interfaces (`integration/`, execute endpoint) | 🟡 delivered, run pending |
+| 8 | Decision log (every decision and execution) and feedback log (execution results, planner outcomes) | 🟡 delivered, run pending |
 
 ---
 
@@ -128,3 +128,4 @@ Status key: ✅ done | 🟡 in progress | ⬜ not started
 | 2026-10-07 | Milestone 2 complete: forecast and risk endpoints verified. Milestone 3 started: design document, tables and business rules delivered. |
 | 2026-10-07 | M3 tables created (22 tables). Agents and orchestrator delivered, awaiting run. |
 | 2026-10-07 | Planner workflow API delivered: recommendations, approve/modify/reject, decision log, business-rule editing. Awaiting run. |
+| 2026-10-07 | Planner workflow verified. Simulated ERP/WMS/POS execution and feedback log delivered, awaiting run. |
