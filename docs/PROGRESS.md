@@ -8,10 +8,10 @@ Status key: ✅ done | 🟡 in progress | ⬜ not started
 |---|---|---|---|---|
 | **M1: Data Foundation** | Data in MySQL, APIs return it, React inventory page shows it | 20% | 100% | ✅ Complete (tagged `milestone-1`) |
 | **M2: Intelligence Layer** | Forecast, shelf-life, spoilage-risk and stockout/excess outputs exist with measured accuracy | 25% | 100% | ✅ Complete (tag `milestone-2`) |
-| **M3: Agentic Decision Engine** | Agents + orchestrator produce evidence-backed proposals; planner approve/modify/reject works; simulated ERP/WMS/POS log actions | 30% | ~5% | 🟡 Started |
+| **M3: Agentic Decision Engine** | Agents + orchestrator produce evidence-backed proposals; planner approve/modify/reject works; simulated ERP/WMS/POS log actions | 30% | ~15% | 🟡 In progress |
 | **M4: Dashboard, Integration, Evaluation** | Full planner workflow in React, end-to-end scenarios run, evaluation report vs baselines | 25% | 0% | ⬜ |
 
-**Overall project progress: about 46%** (20% from M1 + 25% from M2 + 0.05 x 30% from M3). 
+**Overall project progress: about 49%** (20% from M1 + 25% from M2 + 0.15 x 30% from M3). 
 *Weights are our own estimate of effort. Change them if your team sees it differently.
 
 ---
@@ -72,14 +72,14 @@ Status key: ✅ done | 🟡 in progress | ⬜ not started
 
 | # | Task | Status |
 |---|---|---|
-| 1 | Demand and freshness agents | ⬜ |
-| 2 | Replenishment, markdown and inter-store transfer agents | ⬜ |
-| 3 | Orchestrator comparing options and choosing one action per SKU/store | ⬜ |
-| 4 | Configurable business rules (margin floor, max markdown, transfer limits) | 🟡 rules table delivered (`db/schema_m3.sql`) |
-| 5 | Recommendation format: timing, quantity or markdown level, confidence, expected effect, evidence | 🟡 format and tables delivered (`db/schema_m3.sql`, `docs/M3_DESIGN.md`) |
-| 6 | Planner approval APIs: approve, modify, reject | ⬜ |
+| 1 | Demand and freshness agents (`agents/agent_logic.py`) | 🟡 delivered, run pending |
+| 2 | Replenishment, markdown and inter-store transfer agents (`agents/agent_logic.py`) | 🟡 delivered, run pending |
+| 3 | Orchestrator comparing options and choosing one action per SKU/store (`agents/orchestrator.py`) | 🟡 delivered, run pending |
+| 4 | Configurable business rules (margin floor, max markdown, transfer limits) | ✅ (`business_rules` table, read by the agents) |
+| 5 | Recommendation format: timing, quantity or markdown level, confidence, expected effect, evidence | ✅ (`recommendations` table, `docs/M3_DESIGN.md`) |
+| 6 | Planner approval APIs: approve, modify, reject (`RecommendationController`, rules API) | 🟡 delivered, run pending |
 | 7 | Simulated ERP, WMS and POS interfaces | ⬜ |
-| 8 | Decision log and feedback log | ⬜ |
+| 8 | Decision log (written on every decision) and feedback log | 🟡 decision log delivered, feedback log pending |
 
 ---
 
@@ -126,3 +126,5 @@ Status key: ✅ done | 🟡 in progress | ⬜ not started
 | 2026-10-07 | Risk engine run. Batch-history reconstruction and risk backtest delivered, awaiting run. Remaining in M2: API for forecasts and risk tables. |
 | 2026-10-07 | Risk backtest run (see tasks 5-7 for results). Spring Boot endpoints for forecasts and risk delivered, awaiting run. |
 | 2026-10-07 | Milestone 2 complete: forecast and risk endpoints verified. Milestone 3 started: design document, tables and business rules delivered. |
+| 2026-10-07 | M3 tables created (22 tables). Agents and orchestrator delivered, awaiting run. |
+| 2026-10-07 | Planner workflow API delivered: recommendations, approve/modify/reject, decision log, business-rule editing. Awaiting run. |
