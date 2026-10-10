@@ -8,10 +8,10 @@ Status key: ✅ done | 🟡 in progress | ⬜ not started
 |---|---|---|---|---|
 | **M1: Data Foundation** | Data in MySQL, APIs return it, React inventory page shows it | 20% | 100% | ✅ Complete (tagged `milestone-1`) |
 | **M2: Intelligence Layer** | Forecast, shelf-life, spoilage-risk and stockout/excess outputs exist with measured accuracy | 25% | 100% | ✅ Complete (tag `milestone-2`) |
-| **M3: Agentic Decision Engine** | Agents + orchestrator produce evidence-backed proposals; planner approve/modify/reject works; simulated ERP/WMS/POS log actions | 30% | ~15% | 🟡 In progress |
-| **M4: Dashboard, Integration, Evaluation** | Full planner workflow in React, end-to-end scenarios run, evaluation report vs baselines | 25% | 0% | ⬜ |
+| **M3: Agentic Decision Engine** | Agents + orchestrator produce evidence-backed proposals; planner approve/modify/reject works; simulated ERP/WMS/POS log actions | 30% | 100% | ✅ Complete (tag `milestone-3`) |
+| **M4: Dashboard, Integration, Evaluation** | Full planner workflow in React, end-to-end scenarios run, evaluation report vs baselines | 25% | ~5% | 🟡 Started |
 
-**Overall project progress: about 49%** (20% from M1 + 25% from M2 + 0.15 x 30% from M3). 
+**Overall project progress: about 76%** (20% from M1 + 25% from M2 + 30% from M3 + ~1% from M4).
 *Weights are our own estimate of effort. Change them if your team sees it differently.
 
 ---
@@ -72,14 +72,14 @@ Status key: ✅ done | 🟡 in progress | ⬜ not started
 
 | # | Task | Status |
 |---|---|---|
-| 1 | Demand and freshness agents (`agents/agent_logic.py`) | 🟡 delivered, run pending |
-| 2 | Replenishment, markdown and inter-store transfer agents (`agents/agent_logic.py`) | 🟡 delivered, run pending |
-| 3 | Orchestrator comparing options and choosing one action per SKU/store (`agents/orchestrator.py`) | 🟡 delivered, run pending |
+| 1 | Demand and freshness agents (`agents/agent_logic.py`) | ✅ |
+| 2 | Replenishment, markdown and inter-store transfer agents (`agents/agent_logic.py`) | ✅ |
+| 3 | Orchestrator comparing options and choosing one action per SKU/store (`agents/orchestrator.py`) | ✅ |
 | 4 | Configurable business rules (margin floor, max markdown, transfer limits) | ✅ (`business_rules` table, read by the agents) |
 | 5 | Recommendation format: timing, quantity or markdown level, confidence, expected effect, evidence | ✅ (`recommendations` table, `docs/M3_DESIGN.md`) |
-| 6 | Planner approval APIs: approve, modify, reject (`RecommendationController`, rules API) | 🟡 delivered, run pending |
-| 7 | Simulated ERP, WMS and POS interfaces (`integration/`, execute endpoint) | 🟡 delivered, run pending |
-| 8 | Decision log (every decision and execution) and feedback log (execution results, planner outcomes) | 🟡 delivered, run pending |
+| 6 | Planner approval APIs: approve, modify, reject (`RecommendationController`, rules API) | ✅ |
+| 7 | Simulated ERP, WMS and POS interfaces (`integration/`, execute endpoint) | ✅ |
+| 8 | Decision log (every decision and execution) and feedback log (execution results, planner outcomes) | ✅ |
 
 ---
 
@@ -89,8 +89,8 @@ Status key: ✅ done | 🟡 in progress | ⬜ not started
 
 | # | Task | Status |
 |---|---|---|
-| 1 | Planner dashboard connected to backend | ⬜ |
-| 2 | Review, modify, approve, reject workflow in the UI | ⬜ |
+| 1 | Planner dashboard connected to backend (recommendations, inventory, rules tabs) | 🟡 delivered, run pending |
+| 2 | Review, modify, approve, reject, execute and feedback workflow in the UI | 🟡 delivered, run pending |
 | 3 | End-to-end scenarios (e.g. heatwave, festival, delayed delivery) | ⬜ |
 | 4 | Evaluation vs simple forecasting and rule-based approaches (waste, stockouts, margin) | ⬜ |
 | 5 | Evaluation report | ⬜ |
@@ -129,3 +129,4 @@ Status key: ✅ done | 🟡 in progress | ⬜ not started
 | 2026-10-07 | M3 tables created (22 tables). Agents and orchestrator delivered, awaiting run. |
 | 2026-10-07 | Planner workflow API delivered: recommendations, approve/modify/reject, decision log, business-rule editing. Awaiting run. |
 | 2026-10-07 | Planner workflow verified. Simulated ERP/WMS/POS execution and feedback log delivered, awaiting run. |
+| 2026-10-07 | Milestone 3 complete (agents, orchestrator, planner API, simulated ERP/WMS/POS, logs). Milestone 4 started: React planner dashboard delivered, awaiting run. |
