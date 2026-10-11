@@ -21,6 +21,7 @@ from sqlalchemy import text
 
 import agent_logic as agents
 from agent_context import RULE_DEFAULTS, RULE_DESCRIPTIONS, load_context
+from agent_explain import Explainer
 from db import engine
 
 AGENTS_FOR = {"STOCKOUT_RISK": [agents.replenishment_options],
@@ -63,7 +64,7 @@ def decide(ctx, key):
     return options, best
 
 
-def build_row(ctx, key, options, best):
+def build_row(ctx, key, options, best, explainer=None):
     store, sku = key
     product, store_name = ctx.products.loc[sku, "name"], ctx.stores.loc[store, "name"]
     fresh, demand = agents.freshness_view(ctx, key), agents.demand_view(ctx, key)
@@ -84,7 +85,21 @@ def build_row(ctx, key, options, best):
                    f"({fresh['expected_unsold']:.0f} units) are expected to expire unsold.")
         effect = f"Avoids about {best.waste_avoided:.0f} units of waste."
     summary = f"{effect} Net benefit about {best.net_benefit:,.0f} INR at {best.confidence:.0%} confidence."
-    rationale = f"{problem} {describe(best, ctx, key, product, store_name)}. {summary}{why}"
+    reasons, why_text = None, ""
+    if explainer is not None:
+        risk = ctx.sku_risk.loc[key]
+        if risk["alert_type"] == "EXCESS_STOCK":
+            risky = [b for b in fresh["batches"] if b["risk_level"] in ("HIGH", "MEDIUM")]
+            days = int(min(7, max(1, max(b["days_to_expiry"] for b in risky) - 1))) if risky else 3
+        else:
+            days = max(1, int((risk["next_delivery_date"] - ctx.run_date).days - 1))
+        try:
+            reasons = explainer.explain(key, risk["alert_type"], days, fresh, str(risk["next_delivery_date"].date()))
+            items = [x.rstrip(".") for x in ([d["text"] for d in reasons["drivers"][:2]] or reasons["stock_facts"][:2])]
+            why_text = " Why: " + "; ".join(items) + "."
+        except Exception as e:          # an explanation problem must never block the recommendation itself
+            print(f"  (no explanation for {product} at {store_name}: {e.__class__.__name__}: {e})")
+    rationale = f"{problem}{why_text} {describe(best, ctx, key, product, store_name)}. {summary}{why}"
     evidence = {
         "demand_agent": demand, "freshness_agent": fresh,
         "options_considered": [{"agent": o.agent, "action": o.action_type, "quantity": o.quantity,
@@ -92,6 +107,7 @@ def build_row(ctx, key, options, best):
                                 "net_benefit": round(o.net_benefit, 2), "confidence": round(o.confidence, 3),
                                 "feasible": o.feasible, "notes": o.notes, "chosen": o is best} for o in options],
         "rules_applied": {k: ctx.rules[k] for k in ctx.rules if k != "markdown_steps"},
+        "reasons": reasons,
         "method": "Monte Carlo, 2000 simulated futures; benefit compared with doing nothing",
     }
     action_date = (ctx.run_date + timedelta(days=best.action_offset_days)).date()
@@ -141,6 +157,11 @@ if __name__ == "__main__":
         for r in conn.execute(text("SELECT store_id, sku_id FROM recommendations WHERE run_date = :d "
                                    "AND status <> 'PROPOSED'"), {"d": ctx.run_date.date()}):
             decided.add((r[0], r[1]))
+    try:
+        explainer = Explainer(ctx.run_date, ctx.stores, ctx.products)
+    except Exception as e:                      # explanations are optional; never block recommendations
+        print(f"Note: explanations are switched off ({e.__class__.__name__}: {e})")
+        explainer = None
     alerts = ctx.sku_risk[ctx.sku_risk["alert_type"] != "OK"]
     print(f"Stock as of {ctx.run_date.date()} | {len(alerts)} store/SKU pairs with alerts "
           f"({alerts['alert_type'].value_counts().to_dict()})\n")
@@ -153,7 +174,7 @@ if __name__ == "__main__":
         if best is None:
             skipped.append(key)
             continue
-        row, rationale = build_row(ctx, key, options, best)
+        row, rationale = build_row(ctx, key, options, best, explainer)
         out.append((row, options, best))
     save(out, ctx.run_date)
 

@@ -15,6 +15,9 @@ database; anything missing falls back to: no promotion, no event, no rain, tempe
 
 Run:  python intelligence/forecast_next_week.py
 """
+from pathlib import Path
+
+import joblib
 import numpy as np
 import pandas as pd
 from sklearn.ensemble import HistGradientBoostingRegressor
@@ -26,6 +29,7 @@ from db import engine, read_table
 from forecast_model import FEATURES, SEED, build_rows, make_model
 
 MODEL_VERSION = "gbm_v1"
+MODEL_FILE = Path(__file__).resolve().parent / "output" / "forecast_models.joblib"
 
 
 def make_quantile(q):
@@ -148,6 +152,9 @@ if __name__ == "__main__":
         "lower_qty": lo.round(2), "upper_qty": hi.round(2), "model_version": MODEL_VERSION,
     }).sort_values(["store_id", "sku_id", "horizon"]).reset_index(drop=True)
     save(result)
+    MODEL_FILE.parent.mkdir(exist_ok=True)
+    joblib.dump({"models": models, "widen_k": widen_k, "run_date": last_day, "todo": todo},
+                MODEL_FILE)           # lets the agents explain each forecast
     print(f"Saved {len(result)} forecasts to demand_forecasts "
           f"(data up to {last_day.date()}, forecasting {result['forecast_date'].min().date()} "
           f"to {result['forecast_date'].max().date()})")

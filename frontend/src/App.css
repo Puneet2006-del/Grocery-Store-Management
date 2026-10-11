@@ -228,3 +228,17 @@ table.small th, table.small td { padding: 6px 8px; }
 .row-out { color: #8a94a0; }
 .history { margin: 0; padding-left: 18px; font-size: 0.88rem; line-height: 1.6; }
 .rule-input { padding: 6px 8px; border: 1px solid #cbd2d9; border-radius: 6px; width: 160px; }
+
+/* ---------- reasons ---------- */
+.why { margin: 14px 0; padding: 12px 14px; border: 1px solid #e4e7eb; border-radius: 6px; background: #fffdf5; }
+.why h3 { margin: 0 0 8px; }
+.why-headline { margin: 0 0 8px; font-weight: 600; line-height: 1.45; }
+.drivers, .fact-list { margin: 8px 0; padding: 0; list-style: none; font-size: 0.9rem; line-height: 1.5; }
+.drivers li { display: flex; gap: 8px; margin-bottom: 6px; }
+.fact-list li { padding-left: 16px; position: relative; color: #3e4c59; margin-bottom: 4px; }
+.fact-list li::before { content: '–'; position: absolute; left: 4px; }
+.dir { font-weight: 700; width: 14px; flex-shrink: 0; }
+.dir.down { color: #b42318; }
+.dir.up { color: #1f6f3d; }
+.dir.flat { color: #6b7785; }
+.note { font-size: 0.78rem; margin: 8px 0 0; }

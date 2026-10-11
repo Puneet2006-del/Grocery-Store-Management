@@ -39,6 +39,7 @@ export default function RecommendationDetail({ detail, planner, onChanged, onClo
   const by = { decidedBy: planner }
   const isMarkdown = r.actionType === 'MARKDOWN'
   const demand = evidence?.demand_agent
+  const reasons = evidence?.reasons
   const batches = evidence?.freshness_agent?.batches ?? []
 
   return (
@@ -68,6 +69,33 @@ export default function RecommendationDetail({ detail, planner, onChanged, onClo
         <dt>Expected effect</dt>
         <dd>{r.effectSummary}</dd>
       </dl>
+
+      {reasons && (
+        <section className="why">
+          <h3>Why this is happening</h3>
+          <p className="why-headline">{reasons.headline}</p>
+          {reasons.drivers.length > 0 && (
+            <ul className="drivers">
+              {reasons.drivers.map((d) => (
+                <li key={d.factor}>
+                  <span className={`dir ${d.effect_pct == null ? 'flat' : d.effect_pct < 0 ? 'down' : 'up'}`}>
+                    {d.effect_pct == null ? '•' : d.effect_pct < 0 ? '▼' : '▲'}
+                  </span>
+                  <span>{d.text}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+          {reasons.stock_facts.length > 0 && (
+            <ul className="fact-list">
+              {reasons.stock_facts.map((f, i) => (
+                <li key={i}>{f}</li>
+              ))}
+            </ul>
+          )}
+          <p className="muted note">{reasons.note}</p>
+        </section>
+      )}
 
       {error && <div className="banner error">{error}</div>}
 
