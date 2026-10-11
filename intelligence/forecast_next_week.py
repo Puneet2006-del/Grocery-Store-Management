@@ -10,8 +10,8 @@ Three models are used: the mean forecast (Poisson loss) plus a P10 and a P90 qua
 The range is widened by a factor chosen on the backtest so it really covers about 80% of outcomes.
 It is the confidence information later shown with each recommendation.
 
-Assumptions for the future days (a real system would plug in real forecasts):
-  promotions: none known, events: none, rain: 0 mm, temperature: average of the last 7 days.
+For the future days it uses the weather forecast, public holidays and planned promotions stored in the
+database; anything missing falls back to: no promotion, no event, no rain, temperature = last 7-day average.
 
 Run:  python intelligence/forecast_next_week.py
 """
@@ -22,7 +22,7 @@ from sqlalchemy import inspect, text
 
 from baselines import HORIZON, TEST_DAYS
 from dataset import build_panel
-from db import engine
+from db import engine, read_table
 from forecast_model import FEATURES, SEED, build_rows, make_model
 
 MODEL_VERSION = "gbm_v1"
@@ -82,21 +82,31 @@ def interval_backtest(panel):
 
 
 def extend_panel(panel, days=HORIZON):
+    """Add the next `days` days with what is known in advance: the weather forecast, public holidays and
+    planned promotions (from the weather, events and promotions tables). Anything not in those tables falls
+    back to: temperature = last 7-day average, no rain, no event, no promotion."""
     last = panel["date"].max()
     recent_temp = panel[panel["date"] > last - pd.Timedelta(days=7)].groupby("city")["temp_c"].mean()
+    wx = read_table("weather", ["weather_date"])
+    temp_of = {(r.weather_date, r.city): r.temp_c for r in wx.itertuples()}
+    rain_of = {(r.weather_date, r.city): r.rain_mm for r in wx.itertuples()}
+    ev = read_table("events", ["event_date"]).groupby(["event_date", "city"])["expected_impact"].max().to_dict()
+    promos = read_table("promotions", ["start_date", "end_date"])
     parts = [panel]
     for d in range(1, days + 1):
         day = last + pd.Timedelta(days=d)
         f = panel.groupby(["store_id", "sku_id"], as_index=False).tail(1).copy()
+        active = promos[(promos["start_date"] <= day) & (promos["end_date"] >= day)]
+        disc = {(r.store_id, r.sku_id): float(r.discount_pct) for r in active.itertuples()}
         f["date"] = day
         f["qty_sold"] = np.nan
         f["on_hand_end"] = np.nan
         f["true_demand"] = np.nan
         f["stockout"] = False
-        f["discount_pct"] = 0.0
-        f["event_impact"] = 1.0
-        f["rain_mm"] = 0.0
-        f["temp_c"] = f["city"].map(recent_temp)
+        f["discount_pct"] = [disc.get((s, k), 0.0) for s, k in zip(f["store_id"], f["sku_id"])]
+        f["event_impact"] = [float(ev.get((day, c), 1.0)) for c in f["city"]]
+        f["rain_mm"] = [float(rain_of.get((day, c), 0.0)) for c in f["city"]]
+        f["temp_c"] = [float(temp_of.get((day, c), recent_temp[c])) for c in f["city"]]
         f["dow"] = day.dayofweek
         f["month"] = day.month
         f["is_weekend"] = day.dayofweek >= 5

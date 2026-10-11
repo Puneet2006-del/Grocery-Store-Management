@@ -16,7 +16,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
 import java.util.stream.Collectors;
-import org.springframework.beans.factory.annotation.Value;
+import javax.sql.DataSource;
+import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 
@@ -26,24 +27,30 @@ public class InventoryService {
     private final BatchRepository batchRepository;
     private final StoreRepository storeRepository;
     private final ProductRepository productRepository;
-    private final LocalDate defaultAsOf;
+    private final JdbcClient jdbc;
 
-    /**
-     * The simulated data ends on a fixed date, so "today" for expiry maths is
-     * app.as-of-date (set in application.properties), not the real clock.
-     */
     public InventoryService(BatchRepository batchRepository,
                             StoreRepository storeRepository,
                             ProductRepository productRepository,
-                            @Value("${app.as-of-date}") String asOfDate) {
+                            DataSource dataSource) {
         this.batchRepository = batchRepository;
         this.storeRepository = storeRepository;
         this.productRepository = productRepository;
-        this.defaultAsOf = LocalDate.parse(asOfDate);
+        this.jdbc = JdbcClient.create(dataSource);
     }
 
+    /**
+     * "Today" for expiry maths is the latest day with stock data. The daily update moves it forward,
+     * so days to expiry always refer to the current position.
+     */
     public LocalDate defaultAsOf() {
-        return defaultAsOf;
+        List<LocalDate> rows = jdbc.sql("SELECT MAX(snapshot_date) AS d FROM inventory_snapshots")
+                .query((rs, i) -> {
+                    java.sql.Date d = rs.getDate("d");
+                    return d == null ? null : d.toLocalDate();
+                }).list();
+        LocalDate latest = rows.isEmpty() ? null : rows.get(0);
+        return latest != null ? latest : LocalDate.now();
     }
 
     public static String freshness(long daysToExpiry) {
@@ -61,7 +68,7 @@ public class InventoryService {
 
     /** Batch-level view: every batch with stock left, with days to expiry. */
     public List<BatchItem> batchItems(String storeId, String skuId, String category, LocalDate asOf) {
-        LocalDate ref = asOf != null ? asOf : defaultAsOf;
+        LocalDate ref = asOf != null ? asOf : defaultAsOf();
         Map<String, Store> stores = storeRepository.findAll().stream()
                 .collect(Collectors.toMap(Store::getStoreId, Function.identity()));
         Map<String, Product> products = productRepository.findAll().stream()
@@ -93,7 +100,7 @@ public class InventoryService {
 
     /** One row per store and SKU, including SKUs with zero stock (stockouts). */
     public List<InventorySummaryItem> summary(String storeId, String category, LocalDate asOf) {
-        LocalDate ref = asOf != null ? asOf : defaultAsOf;
+        LocalDate ref = asOf != null ? asOf : defaultAsOf();
         Map<String, List<BatchItem>> grouped = batchItems(storeId, null, category, ref).stream()
                 .collect(Collectors.groupingBy(i -> i.storeId() + "|" + i.skuId()));
         List<Product> products = productRepository.findAllByOrderBySkuIdAsc();

@@ -11,6 +11,7 @@ For each store/SKU with an alert from the risk engine:
 
 Run:  python agents/orchestrator.py        (needs the risk engine to have run)
 Re-running replaces PROPOSED recommendations; ones a planner already decided are left alone.
+Unreviewed recommendations from earlier days are marked EXPIRED so nobody acts on stale advice.
 """
 import json
 from datetime import timedelta
@@ -107,6 +108,8 @@ def build_row(ctx, key, options, best):
 
 def save(rows_with_options, run_date):
     with engine.begin() as conn:
+        conn.execute(text("UPDATE recommendations SET status = 'EXPIRED' WHERE status = 'PROPOSED' AND run_date < :d"),
+                     {"d": run_date.date()})                       # unreviewed recommendations from earlier days
         old = "SELECT rec_id FROM recommendations WHERE run_date = :d AND status = 'PROPOSED'"
         conn.execute(text(f"DELETE FROM recommendation_options WHERE rec_id IN ({old})"), {"d": run_date.date()})
         conn.execute(text("DELETE FROM recommendations WHERE run_date = :d AND status = 'PROPOSED'"), {"d": run_date.date()})
