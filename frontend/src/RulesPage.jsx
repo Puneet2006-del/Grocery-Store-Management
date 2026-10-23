@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { getRules, updateRule } from './api'
+import { getRules, resetRule, updateRule } from './api'
 
 export default function RulesPage() {
   const [rules, setRules] = useState([])
@@ -25,9 +25,21 @@ export default function RulesPage() {
     }
   }
 
+  async function reset(rule) {
+    try {
+      const updated = await resetRule(rule.key)
+      setRules(rules.map((r) => (r.key === updated.key ? updated : r)))
+      setEdits({ ...edits, [rule.key]: undefined })
+      setError('')
+      setSaved(`${rule.key} is back to the default.`)
+    } catch (e) {
+      setError(e.message)
+    }
+  }
+
   return (
     <div>
-      <p className="muted">Business rules the agents must respect. Changes apply the next time the agents run.</p>
+      <p className="muted">Your business rules. They apply only to your shops, and the agents use the new values the next time they run.</p>
       {saved && <div className="banner ok">{saved}</div>}
       {error && <div className="banner error">{error}</div>}
       <div className="table-wrap">
@@ -54,6 +66,11 @@ export default function RulesPage() {
                     {edited && (
                       <button className="btn primary" onClick={() => save(r)}>
                         Save
+                      </button>
+                    )}
+                    {!edited && r.customised && (
+                      <button className="link" onClick={() => reset(r)}>
+                        Reset to default
                       </button>
                     )}
                   </td>

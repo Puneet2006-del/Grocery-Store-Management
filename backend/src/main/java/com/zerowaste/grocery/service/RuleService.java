@@ -1,17 +1,29 @@
 package com.zerowaste.grocery.service;
 
+import com.zerowaste.grocery.dto.AuthDtos.UserDto;
 import com.zerowaste.grocery.dto.PlannerDtos.RuleDto;
 import com.zerowaste.grocery.exception.ResourceNotFoundException;
+import com.zerowaste.grocery.security.UserContext;
 import java.sql.Timestamp;
 import java.util.List;
-import java.util.Optional;
 import javax.sql.DataSource;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Service;
 
-/** Reads and edits the configurable business rules used by the agents. */
+/**
+ * Business rules. business_rules holds the defaults; each shopkeeper can override any rule for their own
+ * business (owner_rules). One shopkeeper's change never affects another's.
+ */
 @Service
 public class RuleService {
+
+    private static final String EFFECTIVE = """
+            SELECT b.rule_key, COALESCE(o.rule_value, b.rule_value) AS rule_value, b.description,
+                   COALESCE(o.updated_at, b.updated_at) AS updated_at,
+                   CASE WHEN o.rule_key IS NULL THEN 0 ELSE 1 END AS customised
+            FROM business_rules b
+            LEFT JOIN owner_rules o ON o.rule_key = b.rule_key AND o.owner_id = :u
+            """;
 
     private final JdbcClient jdbc;
 
@@ -21,19 +33,25 @@ public class RuleService {
 
     private static RuleDto map(java.sql.ResultSet rs) throws java.sql.SQLException {
         Timestamp t = rs.getTimestamp("updated_at");
-        return new RuleDto(rs.getString("rule_key"), rs.getString("rule_value"),
-                rs.getString("description"), t == null ? null : t.toLocalDateTime());
+        return new RuleDto(rs.getString("rule_key"), rs.getString("rule_value"), rs.getString("description"),
+                t == null ? null : t.toLocalDateTime(), rs.getInt("customised") == 1);
     }
 
+    private static long owner() {
+        return UserContext.require().userId();
+    }
+
+    /** The rules that apply to the signed-in shopkeeper. */
     public List<RuleDto> all() {
-        return jdbc.sql("SELECT rule_key, rule_value, description, updated_at FROM business_rules ORDER BY rule_key")
-                .query((rs, i) -> map(rs)).list();
+        return jdbc.sql(EFFECTIVE + " ORDER BY b.rule_key").param("u", owner()).query((rs, i) -> map(rs)).list();
     }
 
-    /** Numeric value of a rule, or the fallback when it is missing. */
+    /** Numeric value of a rule for the signed-in shopkeeper, or the fallback when missing. */
     public double number(String key, double fallback) {
-        List<String> v = jdbc.sql("SELECT rule_value FROM business_rules WHERE rule_key = :k")
-                .param("k", key).query((rs, i) -> rs.getString("rule_value")).list();
+        UserDto user = UserContext.get();
+        long u = user == null ? -1 : user.userId();
+        List<String> v = jdbc.sql(EFFECTIVE + " WHERE b.rule_key = :k").param("u", u).param("k", key)
+                .query((rs, i) -> rs.getString("rule_value")).list();
         if (v.isEmpty()) {
             return fallback;
         }
@@ -44,13 +62,14 @@ public class RuleService {
         }
     }
 
+    private RuleDto one(String key) {
+        return jdbc.sql(EFFECTIVE + " WHERE b.rule_key = :k").param("u", owner()).param("k", key)
+                .query((rs, i) -> map(rs)).list().stream().findFirst()
+                .orElseThrow(() -> new ResourceNotFoundException("Rule not found: " + key));
+    }
+
     public RuleDto update(String key, String value) {
-        Optional<RuleDto> existing = jdbc.sql(
-                        "SELECT rule_key, rule_value, description, updated_at FROM business_rules WHERE rule_key = :k")
-                .param("k", key).query((rs, i) -> map(rs)).list().stream().findFirst();
-        if (existing.isEmpty()) {
-            throw new ResourceNotFoundException("Rule not found: " + key);
-        }
+        one(key);                                       // 404 if the rule does not exist
         String v = value.trim();
         switch (key) {
             case "require_planner_approval" -> {
@@ -80,10 +99,17 @@ public class RuleService {
                 }
             }
         }
-        jdbc.sql("UPDATE business_rules SET rule_value = :v WHERE rule_key = :k")
-                .param("v", v).param("k", key).update();
-        return jdbc.sql("SELECT rule_key, rule_value, description, updated_at FROM business_rules WHERE rule_key = :k")
-                .param("k", key).query((rs, i) -> map(rs)).list().get(0);
+        jdbc.sql("DELETE FROM owner_rules WHERE owner_id = :u AND rule_key = :k").param("u", owner()).param("k", key).update();
+        jdbc.sql("INSERT INTO owner_rules (owner_id, rule_key, rule_value) VALUES (:u, :k, :v)")
+                .param("u", owner()).param("k", key).param("v", v).update();
+        return one(key);
+    }
+
+    /** Go back to the default value. */
+    public RuleDto reset(String key) {
+        one(key);
+        jdbc.sql("DELETE FROM owner_rules WHERE owner_id = :u AND rule_key = :k").param("u", owner()).param("k", key).update();
+        return one(key);
     }
 
     private static double parse(String key, String s) {

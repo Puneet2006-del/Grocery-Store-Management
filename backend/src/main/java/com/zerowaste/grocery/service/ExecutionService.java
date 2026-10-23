@@ -34,9 +34,12 @@ public class ExecutionService {
     private final RetailSystems.Erp erp;
     private final RetailSystems.Wms wms;
     private final RetailSystems.Pos pos;
+    private final AccessService access;
 
     public ExecutionService(DataSource dataSource, RecommendationService recommendations,
-                            RetailSystems.Erp erp, RetailSystems.Wms wms, RetailSystems.Pos pos) {
+                            RetailSystems.Erp erp, RetailSystems.Wms wms, RetailSystems.Pos pos,
+                            AccessService access) {
+        this.access = access;
         this.jdbc = JdbcClient.create(dataSource);
         this.recommendations = recommendations;
         this.erp = erp;
@@ -147,10 +150,18 @@ public class ExecutionService {
     }
 
     public List<FeedbackDto> feedback(Long recId) {
+        if (recId != null) {
+            recommendations.get(recId);              // checks that the recommendation is the caller's
+        }
+        List<String> ids = access.storeIds();
+        if (ids.isEmpty()) {
+            return List.of();
+        }
         String sql = "SELECT feedback_id, rec_id, recorded_at, outcome, actual_waste_units, actual_lost_sales_units, "
-                + "planner_rating, comment FROM feedback_log" + (recId != null ? " WHERE rec_id = :id" : "")
-                + " ORDER BY feedback_id DESC";
-        JdbcClient.StatementSpec spec = jdbc.sql(sql);
+                + "planner_rating, comment FROM feedback_log WHERE rec_id IN "
+                + "(SELECT rec_id FROM recommendations WHERE store_id IN (:ids))"
+                + (recId != null ? " AND rec_id = :id" : "") + " ORDER BY feedback_id DESC";
+        JdbcClient.StatementSpec spec = jdbc.sql(sql).param("ids", ids);
         if (recId != null) {
             spec = spec.param("id", recId);
         }
@@ -161,39 +172,53 @@ public class ExecutionService {
     }
 
     // ------------------------------------------- what the simulated systems received
+    private static String filter(String storeColumn, Long recId) {
+        return " WHERE " + storeColumn + " IN (:ids)" + (recId != null ? " AND rec_id = :recId" : "");
+    }
+
+    private java.util.Map<String, Object> scope(Long recId) {
+        java.util.Map<String, Object> m = new java.util.HashMap<>();
+        m.put("ids", access.storeIds());
+        if (recId != null) {
+            m.put("recId", recId);
+        }
+        return m;
+    }
+
     public List<ErpOrderDto> erpOrders(Long recId) {
+        if (access.storeIds().isEmpty()) {
+            return List.of();
+        }
         return jdbc.sql("SELECT po_id, rec_id, store_id, sku_id, qty, order_date, expected_delivery_date, status, "
-                        + "response_message, created_at FROM sim_erp_orders" + where(recId) + " ORDER BY po_id DESC")
-                .params(recParam(recId)).query((rs, i) -> new ErpOrderDto(rs.getLong("po_id"), rs.getLong("rec_id"),
+                        + "response_message, created_at FROM sim_erp_orders" + filter("store_id", recId) + " ORDER BY po_id DESC")
+                .params(scope(recId)).query((rs, i) -> new ErpOrderDto(rs.getLong("po_id"), rs.getLong("rec_id"),
                         rs.getString("store_id"), rs.getString("sku_id"), rs.getInt("qty"), date(rs, "order_date"),
                         date(rs, "expected_delivery_date"), rs.getString("status"), rs.getString("response_message"),
                         ts(rs, "created_at"))).list();
     }
 
     public List<WmsTransferDto> wmsTransfers(Long recId) {
+        if (access.storeIds().isEmpty()) {
+            return List.of();
+        }
         return jdbc.sql("SELECT transfer_id, rec_id, from_store_id, to_store_id, sku_id, qty, status, response_message, "
-                        + "created_at FROM sim_wms_transfers" + where(recId) + " ORDER BY transfer_id DESC")
-                .params(recParam(recId)).query((rs, i) -> new WmsTransferDto(rs.getLong("transfer_id"),
+                        + "created_at FROM sim_wms_transfers" + filter("from_store_id", recId) + " ORDER BY transfer_id DESC")
+                .params(scope(recId)).query((rs, i) -> new WmsTransferDto(rs.getLong("transfer_id"),
                         rs.getLong("rec_id"), rs.getString("from_store_id"), rs.getString("to_store_id"),
                         rs.getString("sku_id"), rs.getInt("qty"), rs.getString("status"),
                         rs.getString("response_message"), ts(rs, "created_at"))).list();
     }
 
     public List<PosPriceChangeDto> posPriceChanges(Long recId) {
+        if (access.storeIds().isEmpty()) {
+            return List.of();
+        }
         return jdbc.sql("SELECT change_id, rec_id, store_id, sku_id, markdown_pct, new_price, effective_date, status, "
-                        + "response_message, created_at FROM sim_pos_price_changes" + where(recId) + " ORDER BY change_id DESC")
-                .params(recParam(recId)).query((rs, i) -> new PosPriceChangeDto(rs.getLong("change_id"),
+                        + "response_message, created_at FROM sim_pos_price_changes" + filter("store_id", recId) + " ORDER BY change_id DESC")
+                .params(scope(recId)).query((rs, i) -> new PosPriceChangeDto(rs.getLong("change_id"),
                         rs.getLong("rec_id"), rs.getString("store_id"), rs.getString("sku_id"),
                         rs.getBigDecimal("markdown_pct"), rs.getBigDecimal("new_price"), date(rs, "effective_date"),
                         rs.getString("status"), rs.getString("response_message"), ts(rs, "created_at"))).list();
-    }
-
-    private static String where(Long recId) {
-        return recId == null ? "" : " WHERE rec_id = :recId";
-    }
-
-    private static java.util.Map<String, Object> recParam(Long recId) {
-        return recId == null ? java.util.Map.of() : java.util.Map.of("recId", recId);
     }
 
     private static LocalDate date(ResultSet rs, String col) throws SQLException {

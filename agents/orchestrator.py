@@ -10,17 +10,17 @@ For each store/SKU with an alert from the risk engine:
   5. recommendation, evidence and all options considered are saved to MySQL
 
 Run:  python agents/orchestrator.py        (needs the risk engine to have run)
-Re-running replaces PROPOSED recommendations; ones a planner already decided are left alone.
+Runs once per shopkeeper, using only that shopkeeper's shops and rules. Re-running replaces PROPOSED recommendations; ones a planner already decided are left alone.
 Unreviewed recommendations from earlier days are marked EXPIRED so nobody acts on stale advice.
 """
 import json
 from datetime import timedelta
 
 import pandas as pd
-from sqlalchemy import text
+from sqlalchemy import bindparam, text
 
 import agent_logic as agents
-from agent_context import RULE_DEFAULTS, RULE_DESCRIPTIONS, load_context
+from agent_context import RULE_DEFAULTS, RULE_DESCRIPTIONS, list_owners, load_context
 from agent_explain import Explainer
 from db import engine
 
@@ -122,13 +122,20 @@ def build_row(ctx, key, options, best, explainer=None):
     }, rationale
 
 
-def save(rows_with_options, run_date):
+def save(rows_with_options, run_date, store_ids):
+    """Replace this shopkeeper's PROPOSED recommendations for the run date (other shopkeepers' rows are untouched)."""
+    ids = list(store_ids)
+    if not ids:
+        return
     with engine.begin() as conn:
-        conn.execute(text("UPDATE recommendations SET status = 'EXPIRED' WHERE status = 'PROPOSED' AND run_date < :d"),
-                     {"d": run_date.date()})                       # unreviewed recommendations from earlier days
-        old = "SELECT rec_id FROM recommendations WHERE run_date = :d AND status = 'PROPOSED'"
-        conn.execute(text(f"DELETE FROM recommendation_options WHERE rec_id IN ({old})"), {"d": run_date.date()})
-        conn.execute(text("DELETE FROM recommendations WHERE run_date = :d AND status = 'PROPOSED'"), {"d": run_date.date()})
+        conn.execute(text("UPDATE recommendations SET status = 'EXPIRED' WHERE status = 'PROPOSED' AND run_date < :d "
+                          "AND store_id IN :ids").bindparams(bindparam("ids", expanding=True)),
+                     {"d": run_date.date(), "ids": ids})            # unreviewed recommendations from earlier days
+        old = "SELECT rec_id FROM recommendations WHERE run_date = :d AND status = 'PROPOSED' AND store_id IN :ids"
+        conn.execute(text(f"DELETE FROM recommendation_options WHERE rec_id IN ({old})").bindparams(bindparam("ids", expanding=True)),
+                     {"d": run_date.date(), "ids": ids})
+        conn.execute(text("DELETE FROM recommendations WHERE run_date = :d AND status = 'PROPOSED' AND store_id IN :ids")
+                     .bindparams(bindparam("ids", expanding=True)), {"d": run_date.date(), "ids": ids})
         for row, options, best in rows_with_options:
             res = conn.execute(text("""
                 INSERT INTO recommendations (run_date, store_id, sku_id, action_type, action_date, timing_note,
@@ -149,9 +156,11 @@ def save(rows_with_options, run_date):
                            "f": o.feasible, "n": o.notes[:255], "ch": o is best})
 
 
-if __name__ == "__main__":
-    ensure_rules()
-    ctx = load_context()
+def process_owner(owner_id, label):
+    ctx = load_context(owner_id)
+    if len(ctx.stores) == 0:
+        print(f"{label}: no shops, skipped\n")
+        return
     decided = set()
     with engine.connect() as conn:
         for r in conn.execute(text("SELECT store_id, sku_id FROM recommendations WHERE run_date = :d "
@@ -163,8 +172,8 @@ if __name__ == "__main__":
         print(f"Note: explanations are switched off ({e.__class__.__name__}: {e})")
         explainer = None
     alerts = ctx.sku_risk[ctx.sku_risk["alert_type"] != "OK"]
-    print(f"Stock as of {ctx.run_date.date()} | {len(alerts)} store/SKU pairs with alerts "
-          f"({alerts['alert_type'].value_counts().to_dict()})\n")
+    print(f"=== {label}: {len(ctx.stores)} shop(s), stock as of {ctx.run_date.date()}, "
+          f"{len(alerts)} store/SKU pairs with alerts ({alerts['alert_type'].value_counts().to_dict()}) ===\n")
 
     out, skipped = [], []
     for key in alerts.index:
@@ -176,19 +185,19 @@ if __name__ == "__main__":
             continue
         row, rationale = build_row(ctx, key, options, best, explainer)
         out.append((row, options, best))
-    save(out, ctx.run_date)
+    save(out, ctx.run_date, ctx.stores.index)
 
     df = pd.DataFrame([r for r, _, _ in out])
     print(f"Saved {len(df)} recommendations ({len(skipped)} alerts had no beneficial, rule-compliant action)")
     if len(df):
         print("\nBy action:")
-        print(df.groupby("action_type").agg(recommendations=("rec_id" if "rec_id" in df else "sku_id", "size"),
+        print(df.groupby("action_type").agg(recommendations=("sku_id", "size"),
                                             net_benefit_inr=("expected_net_benefit", "sum"),
                                             waste_avoided_units=("expected_waste_avoided_units", "sum"),
                                             avg_confidence=("confidence", "mean")).round(2).to_string())
         print(f"\nTotal expected net benefit: {df['expected_net_benefit'].sum():,.0f} INR")
         print("\nTop recommendations")
-        for row, _, _ in sorted(out, key=lambda x: -x[0]["expected_net_benefit"])[:5]:
+        for row, _, _ in sorted(out, key=lambda x: -x[0]["expected_net_benefit"])[:3]:
             print(f"- [{row['action_type']}] {row['rationale']}")
     if skipped:
         print("\nAlerts with no recommendation")
@@ -201,3 +210,17 @@ if __name__ == "__main__":
         else:
             why = "no option cleared the business rules and the minimum confidence"
         print(f"  - {ctx.products.loc[key[1], 'name']} at {ctx.stores.loc[key[0], 'name']}: {why}")
+    print()
+
+
+if __name__ == "__main__":
+    ensure_rules()
+    users = {}
+    try:
+        from db import read_table
+        u = read_table("users")
+        users = dict(zip(u["user_id"], u["display_name"]))
+    except Exception:
+        pass
+    for owner in list_owners():
+        process_owner(owner, users.get(owner, "Shops without an owner") if owner is not None else "Shops without an owner")

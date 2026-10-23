@@ -55,10 +55,10 @@ def d_(ts):
 
 
 # ------------------------------------------------------------------------ weather
-def fetch_open_meteo(lat, lon):
+def fetch_open_meteo(lat, lon, past_days=14):
     r = requests.get("https://api.open-meteo.com/v1/forecast", params={
         "latitude": lat, "longitude": lon, "daily": "temperature_2m_mean,precipitation_sum",
-        "past_days": 14, "forecast_days": 9, "timezone": "Asia/Kolkata"}, timeout=30)
+        "past_days": past_days, "forecast_days": 9, "timezone": "Asia/Kolkata"}, timeout=30)
     r.raise_for_status()
     d = r.json()["daily"]
     return pd.DataFrame({"weather_date": pd.to_datetime(d["time"]), "temp_c": d["temperature_2m_mean"],
@@ -153,7 +153,7 @@ def plan_promotions(series, last_day, rng):
 
 
 # ------------------------------------------------------------------------ the feed
-def recover_factors(panel, products):
+def recover_factors(panel, products, size):
     """Per store/SKU demand level: the hidden random factor of the original simulation,
     recovered from the ground-truth expected demand (or estimated from recent sales if that is missing)."""
     cat = products["category"]
@@ -161,7 +161,7 @@ def recover_factors(panel, products):
     tm = np.clip(1 + p["sku_id"].map(TEMP_COEF).fillna(0) * (p["temp_c"] - 25), 0.7, 1.4)
     rm = 1 - p["sku_id"].map(cat).map(RAIN_EFFECT) * np.minimum(p["rain_mm"] / 20, 1)
     em = p["event_impact"] ** np.where(p["sku_id"].map(cat) == "meat", 0.5, 1.0)
-    formula = (p["sku_id"].map(BASE_DEMAND) * p["store_id"].map(STORE_SIZE) * WEEKDAY[p["dow"].to_numpy()]
+    formula = (p["sku_id"].map(BASE_DEMAND) * p["store_id"].map(size) * WEEKDAY[p["dow"].to_numpy()]
                * tm * rm * em * (1 + 0.03 * p["discount_pct"]))
     p["formula"] = formula
     if TRUTH_FILE.exists():
@@ -173,7 +173,7 @@ def recover_factors(panel, products):
         ratio = recent["qty_sold"] / recent["formula"]
         p = recent
     p["ratio"] = ratio
-    return p.groupby(["store_id", "sku_id"])["ratio"].median().clip(0.5, 1.5).to_dict()
+    return p.groupby(["store_id", "sku_id"])["ratio"].median().clip(0.5, 1.5).fillna(1.0).to_dict()
 
 
 def simulate(last_day, until, seed):
@@ -181,7 +181,9 @@ def simulate(last_day, until, seed):
     stores = read_table("stores").set_index("store_id")
     products = read_table("products").set_index("sku_id")
     panel = build_panel()
-    factors = recover_factors(panel, products)
+    size = {sid: STORE_SIZE.get(sid, float(stores.loc[sid, "size_factor"]) if "size_factor" in stores.columns else 1.0)
+            for sid in stores.index}
+    factors = recover_factors(panel, products, size)
     series = sorted(factors)
 
     source = refresh_weather(stores.reset_index(), pd.Timestamp(last_day) + pd.Timedelta(days=1),
@@ -222,7 +224,7 @@ def simulate(last_day, until, seed):
                     disc, promo_id = float(dsc), pid
             tm = float(np.clip(1 + TEMP_COEF.get(sku, 0) * (wx["temp_c"] - 25), 0.7, 1.4))
             rm = 1 - RAIN_EFFECT[cat] * min(wx["rain_mm"] / 20, 1)
-            expected = (BASE_DEMAND[sku] * STORE_SIZE[store] * factors[(store, sku)] * WEEKDAY[day.dayofweek] * tm * rm
+            expected = (BASE_DEMAND[sku] * size[store] * factors[(store, sku)] * WEEKDAY[day.dayofweek] * tm * rm
                         * ev ** (0.5 if cat == "meat" else 1.0) * (1 + 0.03 * disc))
             want = int(rng.poisson(expected * rng.gamma(20, 1 / 20)))
 
@@ -245,7 +247,8 @@ def simulate(last_day, until, seed):
             if day.dayofweek in DELIVERY_DAYS[cat]:                       # scheduled delivery, legacy ordering rule
                 gap = next(k for k in range(1, 8) if (day.dayofweek + k) % 7 in DELIVERY_DAYS[cat])
                 h = hist.get((store, sku), [])[-7:]
-                avg = float(np.mean(h)) if h else BASE_DEMAND[sku] * STORE_SIZE[store]
+                floor = 0.25 * BASE_DEMAND[sku] * size[store]
+                avg = max(float(np.mean(h)), floor) if h else BASE_DEMAND[sku] * size[store]   # a bad week never switches ordering off
                 target = avg * (gap + (1.0 if shelf >= 7 else 0.5)) * SAFETY[cat]
                 order = max(0, math.ceil(target - sum(b["rem"] for b in act)))
                 if order > 0:

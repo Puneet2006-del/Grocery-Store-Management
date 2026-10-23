@@ -28,8 +28,11 @@ def build_panel() -> pd.DataFrame:
     stores = read_table("stores")
     products = read_table("products")
 
-    # backbone: every store x SKU x day (snapshots cover the full grid)
-    panel = snaps.rename(columns={"snapshot_date": "date", "on_hand_qty": "on_hand_end"})
+    # backbone: every store x SKU x day. A shop that joined later simply has empty (NaN) rows before it started.
+    snaps = snaps.rename(columns={"snapshot_date": "date", "on_hand_qty": "on_hand_end"})
+    grid = pd.MultiIndex.from_product([sorted(snaps["date"].unique()), sorted(snaps["store_id"].unique()),
+                                       sorted(snaps["sku_id"].unique())], names=["date", "store_id", "sku_id"]).to_frame(index=False)
+    panel = grid.merge(snaps[["date", "store_id", "sku_id", "on_hand_end"]], on=["date", "store_id", "sku_id"], how="left")
     panel = panel.merge(
         sales.rename(columns={"sale_date": "date"})[["date", "store_id", "sku_id", "qty_sold", "unit_price"]],
         on=["date", "store_id", "sku_id"], how="left")

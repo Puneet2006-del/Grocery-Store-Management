@@ -46,7 +46,8 @@ public final class PlannerDtos {
                                 String comment, Integer quantity, BigDecimal markdownPct) {
     }
 
-    public record RuleDto(String key, String value, String description, LocalDateTime updatedAt) {
+    /** customised is true when this shopkeeper has changed the rule from the default. */
+    public record RuleDto(String key, String value, String description, LocalDateTime updatedAt, boolean customised) {
     }
 
     public record RuleUpdateRequest(@NotBlank(message = "value is required") String value) {

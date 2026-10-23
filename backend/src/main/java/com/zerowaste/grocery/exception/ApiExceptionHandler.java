@@ -26,6 +26,11 @@ public class ApiExceptionHandler {
         return build(HttpStatus.BAD_REQUEST, "Invalid request: " + ex.getMessage());
     }
 
+    @ExceptionHandler(UnauthorizedException.class)
+    public ResponseEntity<Map<String, Object>> unauthorized(UnauthorizedException ex) {
+        return build(HttpStatus.UNAUTHORIZED, ex.getMessage());
+    }
+
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<Map<String, Object>> invalidBody(MethodArgumentNotValidException ex) {
         String message = ex.getBindingResult().getFieldErrors().stream()

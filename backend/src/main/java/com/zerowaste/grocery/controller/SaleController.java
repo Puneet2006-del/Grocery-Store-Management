@@ -3,8 +3,10 @@ package com.zerowaste.grocery.controller;
 import com.zerowaste.grocery.dto.Dtos.PageResponse;
 import com.zerowaste.grocery.dto.Dtos.SaleDto;
 import com.zerowaste.grocery.repository.SaleRepository;
+import com.zerowaste.grocery.service.AccessService;
 import com.zerowaste.grocery.util.Params;
 import java.time.LocalDate;
+import java.util.List;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -20,9 +22,11 @@ public class SaleController {
     private static final LocalDate MAX_DATE = LocalDate.of(2999, 12, 31);
 
     private final SaleRepository repository;
+    private final AccessService access;
 
-    public SaleController(SaleRepository repository) {
+    public SaleController(SaleRepository repository, AccessService access) {
         this.repository = repository;
+        this.access = access;
     }
 
     /** Paginated sales history, newest first. All filters are optional. */
@@ -43,9 +47,19 @@ public class SaleController {
         if (fromDate.isAfter(toDate)) {
             throw new IllegalArgumentException("'from' must not be after 'to'");
         }
+        String id = Params.id(storeId);
+        List<String> ids;
+        if (id != null) {
+            access.requireStore(id);
+            ids = List.of(id);
+        } else {
+            ids = access.storeIds();
+        }
+        if (ids.isEmpty()) {
+            return new PageResponse<>(List.of(), safePage, safeSize, 0, 0);
+        }
         return PageResponse.of(
-                repository.search(Params.id(storeId), Params.id(skuId), fromDate, toDate,
-                                PageRequest.of(safePage, safeSize))
+                repository.search(ids, Params.id(skuId), fromDate, toDate, PageRequest.of(safePage, safeSize))
                         .map(SaleDto::from));
     }
 }

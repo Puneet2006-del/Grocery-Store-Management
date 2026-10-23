@@ -14,11 +14,13 @@ public final class Dtos {
     private Dtos() {
     }
 
+    /** status: PENDING while a new shop's history and forecasts are being created, READY, or FAILED. */
     public record StoreDto(String storeId, String name, String city, String type,
-                           BigDecimal lat, BigDecimal lon) {
+                           BigDecimal lat, BigDecimal lon, String status, String statusMessage,
+                           BigDecimal sizeFactor) {
         public static StoreDto from(Store s) {
             return new StoreDto(s.getStoreId(), s.getName(), s.getCity(), s.getType(),
-                    s.getLat(), s.getLon());
+                    s.getLat(), s.getLon(), s.getStatus(), s.getStatusMessage(), s.getSizeFactor());
         }
     }
 

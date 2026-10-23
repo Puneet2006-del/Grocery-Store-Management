@@ -18,7 +18,6 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 import javax.sql.DataSource;
 import org.springframework.jdbc.core.simple.JdbcClient;
-import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 
 @Service
@@ -28,11 +27,14 @@ public class InventoryService {
     private final StoreRepository storeRepository;
     private final ProductRepository productRepository;
     private final JdbcClient jdbc;
+    private final AccessService access;
 
     public InventoryService(BatchRepository batchRepository,
                             StoreRepository storeRepository,
                             ProductRepository productRepository,
-                            DataSource dataSource) {
+                            DataSource dataSource,
+                            AccessService access) {
+        this.access = access;
         this.batchRepository = batchRepository;
         this.storeRepository = storeRepository;
         this.productRepository = productRepository;
@@ -69,7 +71,10 @@ public class InventoryService {
     /** Batch-level view: every batch with stock left, with days to expiry. */
     public List<BatchItem> batchItems(String storeId, String skuId, String category, LocalDate asOf) {
         LocalDate ref = asOf != null ? asOf : defaultAsOf();
-        Map<String, Store> stores = storeRepository.findAll().stream()
+        if (storeId != null) {
+            access.requireStore(storeId);
+        }
+        Map<String, Store> stores = storeRepository.findAllById(access.storeIds()).stream()
                 .collect(Collectors.toMap(Store::getStoreId, Function.identity()));
         Map<String, Product> products = productRepository.findAll().stream()
                 .collect(Collectors.toMap(Product::getSkuId, Function.identity()));
@@ -106,7 +111,8 @@ public class InventoryService {
         List<Product> products = productRepository.findAllByOrderBySkuIdAsc();
 
         List<InventorySummaryItem> rows = new ArrayList<>();
-        for (Store s : storeRepository.findAll(Sort.by("storeId"))) {
+        for (Store s : storeRepository.findAllById(access.storeIds()).stream()
+                .sorted(java.util.Comparator.comparing(x -> x.getStoreId())).toList()) {
             if (storeId != null && !storeId.equals(s.getStoreId())) {
                 continue;
             }

@@ -43,8 +43,10 @@ public class RecommendationService {
 
     private final JdbcClient jdbc;
     private final RuleService rules;
+    private final AccessService access;
 
-    public RecommendationService(DataSource dataSource, RuleService rules) {
+    public RecommendationService(DataSource dataSource, RuleService rules, AccessService access) {
+        this.access = access;
         this.jdbc = JdbcClient.create(dataSource);
         this.rules = rules;
     }
@@ -77,20 +79,21 @@ public class RecommendationService {
     // -------------------------------------------------------------------- reads
     public List<RecommendationDto> list(String status, String storeId, String skuId, String actionType,
                                         LocalDate runDate) {
+        if (storeId != null) {
+            access.requireStore(storeId);
+        }
+        List<String> ids = storeId != null ? List.of(storeId) : access.storeIds();
         LocalDate run = runDate != null ? runDate : latestRunDate();
-        if (run == null) {
+        if (run == null || ids.isEmpty()) {
             return List.of();
         }
-        StringBuilder sql = new StringBuilder(SELECT_REC).append(" WHERE r.run_date = :runDate");
+        StringBuilder sql = new StringBuilder(SELECT_REC).append(" WHERE r.run_date = :runDate AND r.store_id IN (:storeIds)");
         Map<String, Object> params = new HashMap<>();
         params.put("runDate", run);
+        params.put("storeIds", ids);
         if (status != null) {
             sql.append(" AND r.status = :status");
             params.put("status", status);
-        }
-        if (storeId != null) {
-            sql.append(" AND r.store_id = :storeId");
-            params.put("storeId", storeId);
         }
         if (skuId != null) {
             sql.append(" AND r.sku_id = :skuId");
@@ -105,9 +108,13 @@ public class RecommendationService {
     }
 
     public RecommendationDto get(long id) {
-        return jdbc.sql(SELECT_REC + " WHERE r.rec_id = :id").param("id", id)
+        RecommendationDto rec = jdbc.sql(SELECT_REC + " WHERE r.rec_id = :id").param("id", id)
                 .query((rs, i) -> mapRec(rs)).list().stream().findFirst()
                 .orElseThrow(() -> new ResourceNotFoundException("Recommendation not found: " + id));
+        if (!access.owns(rec.storeId())) {          // another shopkeeper's recommendation looks like it does not exist
+            throw new ResourceNotFoundException("Recommendation not found: " + id);
+        }
+        return rec;
     }
 
     public RecommendationDetailDto detail(long id) {
@@ -128,9 +135,17 @@ public class RecommendationService {
     }
 
     public List<DecisionDto> decisions(Long recId) {
+        if (recId != null) {
+            get(recId);                              // checks that the recommendation is the caller's
+        }
+        List<String> ids = access.storeIds();
+        if (ids.isEmpty()) {
+            return List.of();
+        }
         String sql = "SELECT log_id, rec_id, decided_at, decided_by, decision, before_json, after_json, comment "
-                + "FROM decision_log" + (recId != null ? " WHERE rec_id = :id" : "") + " ORDER BY log_id DESC";
-        JdbcClient.StatementSpec spec = jdbc.sql(sql);
+                + "FROM decision_log WHERE rec_id IN (SELECT rec_id FROM recommendations WHERE store_id IN (:ids))"
+                + (recId != null ? " AND rec_id = :id" : "") + " ORDER BY log_id DESC";
+        JdbcClient.StatementSpec spec = jdbc.sql(sql).param("ids", ids);
         if (recId != null) {
             spec = spec.param("id", recId);
         }
@@ -144,15 +159,16 @@ public class RecommendationService {
 
     public Map<String, Object> summary(LocalDate runDate) {
         LocalDate run = runDate != null ? runDate : latestRunDate();
+        List<String> ids = access.storeIds();
         Map<String, Object> out = new LinkedHashMap<>();
-        if (run == null) {
+        if (run == null || ids.isEmpty()) {
             out.put("runDate", null);
             return out;
         }
         out.put("runDate", run.toString());
         Map<String, Object> byStatus = new LinkedHashMap<>();
-        jdbc.sql("SELECT status, COUNT(*) AS c FROM recommendations WHERE run_date = :d GROUP BY status ORDER BY status")
-                .param("d", run).query((rs, i) -> {
+        jdbc.sql("SELECT status, COUNT(*) AS c FROM recommendations WHERE run_date = :d AND store_id IN (:ids) GROUP BY status ORDER BY status")
+                .param("d", run).param("ids", ids).query((rs, i) -> {
                     byStatus.put(rs.getString("status"), rs.getInt("c"));
                     return rs.getString("status");
                 }).list();
@@ -161,8 +177,8 @@ public class RecommendationService {
         jdbc.sql("""
                 SELECT action_type, COUNT(*) AS c, COALESCE(SUM(expected_net_benefit), 0) AS benefit,
                        COALESCE(SUM(expected_waste_avoided_units), 0) AS waste
-                FROM recommendations WHERE run_date = :d GROUP BY action_type ORDER BY action_type
-                """).param("d", run).query((rs, i) -> {
+                FROM recommendations WHERE run_date = :d AND store_id IN (:ids) GROUP BY action_type ORDER BY action_type
+                """).param("d", run).param("ids", ids).query((rs, i) -> {
             Map<String, Object> m = new LinkedHashMap<>();
             m.put("count", rs.getInt("c"));
             m.put("expectedNetBenefit", rs.getBigDecimal("benefit"));

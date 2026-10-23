@@ -22,9 +22,20 @@ import org.springframework.stereotype.Service;
 public class IntelligenceService {
 
     private final JdbcClient jdbc;
+    private final AccessService access;
 
-    public IntelligenceService(DataSource dataSource) {
+    public IntelligenceService(DataSource dataSource, AccessService access) {
         this.jdbc = JdbcClient.create(dataSource);
+        this.access = access;
+    }
+
+    /** The shops the caller may see: the one asked for (if it is theirs), otherwise all of theirs. */
+    private List<String> scope(String storeId) {
+        if (storeId != null) {
+            access.requireStore(storeId);
+            return List.of(storeId);
+        }
+        return access.storeIds();
     }
 
     private static LocalDate date(java.sql.ResultSet rs, String col) throws java.sql.SQLException {
@@ -44,8 +55,9 @@ public class IntelligenceService {
     }
 
     public List<ForecastDto> forecasts(String storeId, String skuId, LocalDate runDate) {
+        List<String> ids = scope(storeId);
         LocalDate run = resolve("demand_forecasts", runDate);
-        if (run == null) {
+        if (run == null || ids.isEmpty()) {
             return List.of();
         }
         StringBuilder sql = new StringBuilder("""
@@ -59,10 +71,8 @@ public class IntelligenceService {
                 """);
         Map<String, Object> params = new HashMap<>();
         params.put("runDate", run);
-        if (storeId != null) {
-            sql.append(" AND f.store_id = :storeId");
-            params.put("storeId", storeId);
-        }
+        sql.append(" AND f.store_id IN (:storeIds)");
+        params.put("storeIds", ids);
         if (skuId != null) {
             sql.append(" AND f.sku_id = :skuId");
             params.put("skuId", skuId);
@@ -77,8 +87,9 @@ public class IntelligenceService {
     }
 
     public List<BatchRiskDto> batchRisk(String storeId, String skuId, String riskLevel, LocalDate runDate) {
+        List<String> ids = scope(storeId);
         LocalDate run = resolve("batch_risk", runDate);
-        if (run == null) {
+        if (run == null || ids.isEmpty()) {
             return List.of();
         }
         StringBuilder sql = new StringBuilder("""
@@ -93,10 +104,8 @@ public class IntelligenceService {
                 """);
         Map<String, Object> params = new HashMap<>();
         params.put("runDate", run);
-        if (storeId != null) {
-            sql.append(" AND r.store_id = :storeId");
-            params.put("storeId", storeId);
-        }
+        sql.append(" AND r.store_id IN (:storeIds)");
+        params.put("storeIds", ids);
         if (skuId != null) {
             sql.append(" AND r.sku_id = :skuId");
             params.put("skuId", skuId);
@@ -118,8 +127,9 @@ public class IntelligenceService {
 
     public List<SkuRiskDto> skuRisk(String storeId, String category, String alertType,
                                     String severity, LocalDate runDate) {
+        List<String> ids = scope(storeId);
         LocalDate run = resolve("sku_risk", runDate);
-        if (run == null) {
+        if (run == null || ids.isEmpty()) {
             return List.of();
         }
         StringBuilder sql = new StringBuilder("""
@@ -134,10 +144,8 @@ public class IntelligenceService {
                 """);
         Map<String, Object> params = new HashMap<>();
         params.put("runDate", run);
-        if (storeId != null) {
-            sql.append(" AND r.store_id = :storeId");
-            params.put("storeId", storeId);
-        }
+        sql.append(" AND r.store_id IN (:storeIds)");
+        params.put("storeIds", ids);
         if (category != null) {
             sql.append(" AND LOWER(p.category) = :category");
             params.put("category", category.toLowerCase());
@@ -166,25 +174,26 @@ public class IntelligenceService {
     /** Headline numbers for a dashboard: alert counts and expected waste. */
     public Map<String, Object> summary(LocalDate runDate) {
         LocalDate run = resolve("batch_risk", runDate);
+        List<String> ids = access.storeIds();
         Map<String, Object> out = new LinkedHashMap<>();
-        if (run == null) {
+        if (run == null || ids.isEmpty()) {
             out.put("runDate", null);
             return out;
         }
         out.put("runDate", run.toString());
 
         Map<String, Object> batchLevels = new LinkedHashMap<>();
-        jdbc.sql("SELECT risk_level, COUNT(*) AS c FROM batch_risk WHERE run_date = :d GROUP BY risk_level")
-                .param("d", run).query((rs, i) -> {
+        jdbc.sql("SELECT risk_level, COUNT(*) AS c FROM batch_risk WHERE run_date = :d AND store_id IN (:ids) GROUP BY risk_level")
+                .param("d", run).param("ids", ids).query((rs, i) -> {
                     batchLevels.put(rs.getString("risk_level"), rs.getInt("c"));
                     return rs.getString("risk_level");
                 }).list();
         out.put("batchesByRiskLevel", batchLevels);
 
         Map<String, Object> alerts = new LinkedHashMap<>();
-        jdbc.sql("SELECT alert_type, severity, COUNT(*) AS c FROM sku_risk WHERE run_date = :d "
+        jdbc.sql("SELECT alert_type, severity, COUNT(*) AS c FROM sku_risk WHERE run_date = :d AND store_id IN (:ids) "
                         + "GROUP BY alert_type, severity ORDER BY alert_type, severity")
-                .param("d", run).query((rs, i) -> {
+                .param("d", run).param("ids", ids).query((rs, i) -> {
                     alerts.put(rs.getString("alert_type") + "_" + rs.getString("severity"), rs.getInt("c"));
                     return rs.getString("alert_type");
                 }).list();
@@ -195,8 +204,8 @@ public class IntelligenceService {
                        COALESCE(SUM(expected_waste_cost), 0) AS cost,
                        COALESCE(SUM(CASE WHEN days_to_expiry <= 1 THEN expected_unsold ELSE 0 END), 0) AS late_units,
                        COALESCE(SUM(CASE WHEN days_to_expiry <= 1 THEN expected_waste_cost ELSE 0 END), 0) AS late_cost
-                FROM batch_risk WHERE run_date = :d
-                """).param("d", run).query((rs, i) -> {
+                FROM batch_risk WHERE run_date = :d AND store_id IN (:ids)
+                """).param("d", run).param("ids", ids).query((rs, i) -> {
             Map<String, Object> m = new LinkedHashMap<>();
             m.put("expectedUnsoldUnits", rs.getBigDecimal("units"));
             m.put("expectedWasteCost", rs.getBigDecimal("cost"));

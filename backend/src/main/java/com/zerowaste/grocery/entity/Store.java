@@ -29,10 +29,22 @@ public class Store {
     @Column(name = "lon")
     private BigDecimal lon;
 
+    @Column(name = "status")
+    private String status;
+
+    @Column(name = "status_message")
+    private String statusMessage;
+
+    @Column(name = "size_factor")
+    private BigDecimal sizeFactor;
+
     public String getStoreId() { return storeId; }
     public String getName() { return name; }
     public String getCity() { return city; }
     public String getType() { return type; }
     public BigDecimal getLat() { return lat; }
     public BigDecimal getLon() { return lon; }
+    public String getStatus() { return status; }
+    public String getStatusMessage() { return statusMessage; }
+    public BigDecimal getSizeFactor() { return sizeFactor; }
 }

@@ -44,7 +44,18 @@ def parse_rules(raw: dict) -> dict:
     return rules
 
 
-def load_context() -> Context:
+def list_owners():
+    """Owner ids that have shops (None stands for shops that no one owns yet, as before accounts existed)."""
+    stores = read_table("stores")
+    if "owner_id" not in stores.columns:
+        return [None]
+    ids = stores["owner_id"].dropna().astype(int).unique().tolist()
+    return sorted(ids) + ([None] if stores["owner_id"].isna().any() else [])
+
+
+def load_context(owner_id=None) -> Context:
+    """Everything the agents need for ONE shopkeeper: their shops, stock, forecasts, prices and rules.
+    Transfers can therefore only happen between shops of the same owner."""
     sku_risk = read_table("sku_risk", ["run_date", "next_delivery_date"])
     run_date = sku_risk["run_date"].max()
     sku_risk = sku_risk[sku_risk["run_date"] == run_date].set_index(["store_id", "sku_id"])
@@ -52,12 +63,25 @@ def load_context() -> Context:
     batch_risk = batch_risk[batch_risk["run_date"] == run_date]
     products = read_table("products").set_index("sku_id")
     stores = read_table("stores").set_index("store_id")
+    if "owner_id" in stores.columns:
+        mine = stores["owner_id"].fillna(-1).astype(int) == (-1 if owner_id is None else int(owner_id))
+        stores = stores[mine]
+    keep = set(stores.index)
+    sku_risk = sku_risk[sku_risk.index.get_level_values("store_id").isin(keep)]
+    batch_risk = batch_risk[batch_risk["store_id"].isin(keep)]
     rules_df = read_table("business_rules")
-    ctx = Context(run_date, stores, products, parse_rules(dict(zip(rules_df["rule_key"], rules_df["rule_value"]))),
-                  sku_risk=sku_risk, batch_risk=batch_risk)
+    raw = dict(zip(rules_df["rule_key"], rules_df["rule_value"]))
+    if owner_id is not None:                       # this shopkeeper's own values override the defaults
+        try:
+            own = read_table("owner_rules")
+            raw.update(dict(zip(own.loc[own["owner_id"] == int(owner_id), "rule_key"],
+                                own.loc[own["owner_id"] == int(owner_id), "rule_value"])))
+        except Exception:
+            pass
+    ctx = Context(run_date, stores, products, parse_rules(raw), sku_risk=sku_risk, batch_risk=batch_risk)
 
     fc = read_table("demand_forecasts", ["run_date", "forecast_date"])
-    fc = fc[fc["run_date"] == run_date]
+    fc = fc[(fc["run_date"] == run_date) & fc["store_id"].isin(keep)]
     for key, g in fc.groupby(["store_id", "sku_id"]):
         g = g.sort_values("horizon")
         lo, hi = g["lower_qty"].to_numpy(float), g["upper_qty"].to_numpy(float)
@@ -68,7 +92,7 @@ def load_context() -> Context:
         ctx.batches[key] = g.sort_values("days_to_expiry").reset_index(drop=True)
 
     prices = read_table("prices", ["effective_date"])
-    prices = prices[prices["effective_date"] <= run_date].sort_values("effective_date")
+    prices = prices[(prices["effective_date"] <= run_date) & prices["store_id"].isin(keep)].sort_values("effective_date")
     for key, g in prices.groupby(["store_id", "sku_id"]):
         ctx.prices[key] = float(g["price"].iloc[-1])
     return ctx
